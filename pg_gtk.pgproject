@@ -1,0 +1,3 @@
+Include src/GtkImage.h
+Library ./libpg_gtk.so
+Pkgconfig gtk+-2.0
