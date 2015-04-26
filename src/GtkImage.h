@@ -38,10 +38,15 @@ public:
 
 	void process(const Image& in) {
 		tmp.init(in.w, in.h);
-		for(uint i=in.n-1; i--;) tmp[i*3] = tmp[i*3+1] = tmp[i*3+2] = in[i]*255;
+		for(uint i=in.n; i--;) tmp[i*3] = tmp[i*3+1] = tmp[i*3+2] = in[i]*255;
 		process(tmp);
 	}
 
+	void process(const Matrix& in) {
+		tmp.init(in.w, in.h);
+		for(uint i=in.n; i--;) tmp[i*3] = tmp[i*3+1] = tmp[i*3+2] = in[i]*255;
+		process(tmp);
+	}
 
 };
 
