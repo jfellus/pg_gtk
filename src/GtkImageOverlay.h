@@ -63,16 +63,19 @@ public:
 		process(tmp, overlay_points);
 	}
 
-	void process(const ImageRGB& in, const Matrix& point) {
+	void process(const ImageRGB& in, const Matrix& points) {
 		viewer->set_image(in.data, in.w, in.h);
-		viewer->set_overlay_point((int)point[0], (int)point[1]);
+		viewer->clear_overlay_points();
+		for(uint i=0; i<points.h; i++) {
+			viewer->add_overlay_point((int)points(i,0), (int)points(i,1));
+		}
 		viewer->swap();
 	}
 
-	void process(const Image& in, const Matrix& point) {
+	void process(const Image& in, const Matrix& points) {
 		tmp.init(in.w, in.h);
 		for(uint i=in.n; i--;) tmp[i*3] = tmp[i*3+1] = tmp[i*3+2] = in[i]*255;
-		process(tmp, point);
+		process(tmp, points);
 	}
 
 	void process(const ImageRGB& in, const Matrix& overlays, const Matrix& overlays_points) {

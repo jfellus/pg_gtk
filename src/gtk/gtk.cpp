@@ -28,6 +28,7 @@ static gboolean _on_mouse_move (GtkWidget *widget, GdkEventMotion  *event, gpoin
 	return TRUE;
 }
 static gboolean _on_click (GtkWidget *widget, GdkEventButton  *event, gpointer   user_data) {
+	((ImageViewerComponent*)user_data)->on_click(event->x, event->y);
 	return TRUE;
 }
 static gboolean _on_unclick (GtkWidget *widget, GdkEventButton  *event, gpointer   user_data) {
@@ -90,18 +91,13 @@ ImageViewerComponent::ImageViewerComponent(const std::string& title) {
 	bRealloc = true;
 	this->title = title;
 	bNeedRepaint = true;
-	displayed_overlay_points = new std::vector<OverlayPoint*>();
-	buf_overlay_points = new std::vector<OverlayPoint*>();
-	displayed_overlay_images = new std::vector<OverlayImage*>();
-	buf_overlay_images = new std::vector<OverlayImage*>();
-	displayed_overlay_texts = new std::vector<OverlayText*>();
-	buf_overlay_texts = new std::vector<OverlayText*>();
+	data = new DisplayData();
+	data2 = new DisplayData();
+	bClick = false;
 
 	bFirstDraw = true;
 	_zoom = 1;
 	offsetx = offsety = 0;
-	w1 = h1 = w2 = h2 = 0;
-	buf_img_data = displayed_img_data = 0;
 
 	if(!inited) init();
 
@@ -124,57 +120,54 @@ void ImageViewerComponent::_init_instance() {
 	if(tabs) gtk_notebook_append_page(GTK_NOTEBOOK(tabs), (GtkWidget*)image_viewer, gtk_label_new(title.c_str()));
 	else gtk_container_add (GTK_CONTAINER (window), (GtkWidget*)image_viewer);
 
-
 	gtk_widget_show ((GtkWidget*)image_viewer);
 	gtk_widget_set_size_request(GTK_WIDGET(image_viewer), 800,600);
 	g_signal_connect(G_OBJECT((GtkWidget*)image_viewer), "draw", G_CALLBACK(_on_draw), this);
 }
 
 void ImageViewerComponent::set_image(const unsigned char* data, uint w, uint h) {
-	pthread_mutex_lock(&mut);
-	this->w2 = w;
-	this->h2 = h;
-	this->buf_img_data = data;
-	pthread_mutex_unlock(&mut);
-//	repaint();
+	this->data->set_image(data, w, h);
 }
 
 void ImageViewerComponent::set_overlay_points_image(const float* data, uint w, uint h) {
-	std::vector<OverlayPoint*>* overlay_points = buf_overlay_points;
-	for(uint i=0; i<overlay_points->size(); i++) delete (*buf_overlay_points)[i];
-	overlay_points->clear();
+	this->data->overlay_points.clear();
 	for(uint y=0; y<h; y++) {
 		for(uint x=0; x<w; x++) {
 			if(data[y*w+x]>0.0001) {
-				overlay_points->push_back(new OverlayPoint(x,y));
+				this->data->add_overlay_point(OverlayPoint(x,y));
 			}
 		}
 	}
 }
 
 void ImageViewerComponent::add_overlay_image(int x, int y, const float* data, uint w, uint h) {
-	buf_overlay_images->push_back(new OverlayImage(x,y,w,h,data));
+	this->data->add_overlay_image(OverlayImage(x,y,w,h,data));
 }
 
 void ImageViewerComponent::clear_overlay_images() {
-	for(uint i=0; i<buf_overlay_images->size(); i++) delete (*buf_overlay_images)[i];
-	buf_overlay_images->clear();
+	this->data->overlay_images.clear();
 }
 
 void ImageViewerComponent::add_overlay_text(int x, int y, const char* s) {
-	buf_overlay_texts->push_back(new OverlayText(x,y,s));
+	this->data->add_overlay_text(OverlayText(x,y,s));
 }
 
 void ImageViewerComponent::clear_overlay_texts() {
-//	for(uint i=0; i<buf_overlay_texts->size(); i++) delete (*buf_overlay_texts)[i];
-	buf_overlay_texts->clear();
+	this->data->overlay_texts.clear();
 }
 
 
 void ImageViewerComponent::set_overlay_point(int x, int y) {
-//	for(uint i=0; i<buf_overlay_points->size(); i++) delete (*buf_overlay_points)[i];
-	buf_overlay_points->clear();
-	buf_overlay_points->push_back(new OverlayPoint(x,y));
+	this->data->overlay_points.clear();
+	this->data->add_overlay_point(OverlayPoint(x,y));
+}
+
+void ImageViewerComponent::clear_overlay_points() {
+	this->data->overlay_points.clear();
+}
+
+void ImageViewerComponent::add_overlay_point(int x, int y) {
+	this->data->add_overlay_point(OverlayPoint(x,y));
 }
 
 void ImageViewerComponent::zoom(float fzoom, double cx, double cy) {
@@ -201,10 +194,11 @@ void ImageViewerComponent::zoom(double x, double y, double w, double h) {
 
 void ImageViewerComponent::move(double dx, double dy) {offsetx += dx; offsety += dy; do_repaint();}
 
+gboolean _redraw(void* p) {
+	gtk_widget_queue_draw((GtkWidget*)p); return FALSE;
+}
 void ImageViewerComponent::repaint() {
-	pthread_mutex_lock(&mut);
-	do_repaint();
-	pthread_mutex_unlock(&mut);
+	g_idle_add(_redraw,image_viewer);
 }
 
 void ImageViewerComponent::do_repaint() {
@@ -216,37 +210,24 @@ void ImageViewerComponent::do_repaint() {
 int ImageViewerComponent::get_width() {return gtk_widget_get_allocated_width((GtkWidget*)image_viewer);}
 int ImageViewerComponent::get_height() {return gtk_widget_get_allocated_height((GtkWidget*)image_viewer);}
 
-gboolean _redraw(void* p) {
-	gtk_widget_queue_draw((GtkWidget*)p); return FALSE;
-}
+
 void ImageViewerComponent::swap() {
 	pthread_mutex_lock(&mut);
-	std::vector<OverlayPoint*>* tmp_points = buf_overlay_points;
-	std::vector<OverlayImage*>* tmp_images = buf_overlay_images;
-	std::vector<OverlayText*>* tmp_texts = buf_overlay_texts;
-	const unsigned char* tmp_img_data = buf_img_data;
-	buf_overlay_images = displayed_overlay_images;
-	buf_overlay_points = displayed_overlay_points;
-	buf_overlay_texts = displayed_overlay_texts;
-	buf_img_data = displayed_img_data;
-	displayed_overlay_images = tmp_images;
-	displayed_overlay_points = tmp_points;
-	displayed_overlay_texts = tmp_texts;
-	displayed_img_data = tmp_img_data;
-	uint tmph = h1; h1 = h2; h2 = tmph;
-	uint tmpw = w1; w1 = w2; w2 = tmpw;
-	g_timeout_add(10, _redraw,image_viewer);
+	DisplayData* tmp = data;
+	data = data2;
+	data2 = tmp;
+	bClick = false;
+	repaint();
 	pthread_mutex_unlock(&mut);
 }
 
 void ImageViewerComponent::draw(void* _cr) {
 	cairo_t* cr = (cairo_t*)_cr;
-	if(!image_viewer || !gtk_widget_get_realized(GTK_WIDGET(image_viewer)) || !w1 || !h1) return;
+	if(!image_viewer || !gtk_widget_get_realized(GTK_WIDGET(image_viewer))) return;
 	pthread_mutex_lock(&mut);
 	do_repaint();
-	if(!displayed_img_data) return;
-	if(bFirstDraw){
-		zoom(0,0,w1,h1);
+	if(bFirstDraw && data2->w && data2->h){
+		zoom(0,0,data2->w,data2->h);
 		bFirstDraw = false;
 	}
 	cairo_set_source_rgb(cr, .5,.5,.5);
@@ -255,49 +236,43 @@ void ImageViewerComponent::draw(void* _cr) {
 	cairo_translate(cr, offsetx, offsety);
 	cairo_scale(cr, _zoom, _zoom);
 
-	{
-		cairo_surface_t* pixbuf = cairo_image_surface_create(CAIRO_FORMAT_RGB24, w1, h1);
+	if(data2->img) {
+		cairo_surface_t* pixbuf = cairo_image_surface_create(CAIRO_FORMAT_RGB24, data2->w, data2->h);
 		uint* data = (uint*)cairo_image_surface_get_data((cairo_surface_t*)pixbuf);
-		for(uint i=0; i<w1*h1; i++) data[i] = ((uint)displayed_img_data[i*3])<<16 |((uint)displayed_img_data[i*3+1])<<8 | ((uint)displayed_img_data[i*3+2]);
+		for(uint i=0; i<data2->w*data2->h; i++) data[i] = ((uint)data2->img[i*3])<<16 |((uint)data2->img[i*3+1])<<8 | ((uint)data2->img[i*3+2]);
 		cairo_set_source_surface(cr, (cairo_surface_t*)pixbuf, 0, 0);
 		cairo_set_antialias(cr, CAIRO_ANTIALIAS_NONE);
 		cairo_pattern_set_filter(cairo_get_source(cr), CAIRO_FILTER_FAST);
-		cairo_rectangle(cr, 0,0,w1,h1);
+		cairo_rectangle(cr, 0,0,data2->w,data2->h);
 		cairo_fill(cr);
 		cairo_surface_destroy(pixbuf);
 	}
 
-	std::vector<OverlayPoint*>* overlay_points = displayed_overlay_points;
-	std::vector<OverlayImage*>* overlay_images = displayed_overlay_images;
-	std::vector<OverlayText*>* overlay_texts = displayed_overlay_texts;
-
-	if(!overlay_points->empty()) {
+	if(!data2->overlay_points.empty()) {
 		cairo_set_source_rgb(cr, 1,0,0);
-		for(uint i=0; i<overlay_points->size(); i++) {
-			cairo_rectangle(cr, (*overlay_points)[i]->x-2, (*overlay_points)[i]->y-2, 4,4);
+		for(uint i=0; i<data2->overlay_points.size(); i++) {
+			cairo_rectangle(cr, data2->overlay_points[i].x-2, data2->overlay_points[i].y-2, 4,4);
 			cairo_fill(cr);
 		}
 	}
 
-	if(!overlay_images->empty()) {
-		for(uint i=0; i<overlay_images->size(); i++) {
-			OverlayImage* o = (*overlay_images)[i];
-			cairo_surface_t* pixbuf = cairo_image_surface_create(CAIRO_FORMAT_RGB24, o->w, o->h);
+	if(!data2->overlay_images.empty()) {
+		for(uint i=0; i<data2->overlay_images.size(); i++) {
+			cairo_surface_t* pixbuf = cairo_image_surface_create(CAIRO_FORMAT_RGB24, data2->overlay_images[i].w, data2->overlay_images[i].h);
 			uint* d = (uint*)cairo_image_surface_get_data((cairo_surface_t*)pixbuf);
-			const float* data = o->img;
-			for(uint j=o->w*o->h;j--;) d[j] = ((uint)(data[j]*255) << 16 | (uint)(data[j]*255) << 8 | (uint)(data[j]*255));
-			cairo_set_source_surface(cr, pixbuf, o->x - o->w/2, o->y - o->h/2);
-			cairo_rectangle(cr, o->x - o->w/2, o->y - o->h/2, o->w, o->h);
+			const float* data = data2->overlay_images[i].img;
+			for(uint j=data2->overlay_images[i].w*data2->overlay_images[i].h;j--;) d[j] = ((uint)(data[j]*255) << 16 | (uint)(data[j]*255) << 8 | (uint)(data[j]*255));
+			cairo_set_source_surface(cr, pixbuf, data2->overlay_images[i].x - data2->overlay_images[i].w/2, data2->overlay_images[i].y - data2->overlay_images[i].h/2);
+			cairo_rectangle(cr, data2->overlay_images[i].x - data2->overlay_images[i].w/2, data2->overlay_images[i].y - data2->overlay_images[i].h/2, data2->overlay_images[i].w, data2->overlay_images[i].h);
 			cairo_fill(cr);
 			cairo_surface_destroy(pixbuf);
 		}
 	}
 
 
-	if(!overlay_texts->empty()) {
-		for(uint i=0; i<overlay_texts->size(); i++) {
-			OverlayText* o = (*overlay_texts)[i];
-			cairo_translate(cr, o->x , o->y);
+	if(!data2->overlay_texts.empty()) {
+		for(uint i=0; i<data2->overlay_texts.size(); i++) {
+			cairo_translate(cr, data2->overlay_texts[i].x , data2->overlay_texts[i].y);
 
 			cairo_set_source_rgba(cr, 1,0,0,0.5);
 			cairo_arc(cr, 0,0,7, 0, 6.5);
@@ -305,12 +280,16 @@ void ImageViewerComponent::draw(void* _cr) {
 
 			cairo_translate(cr, -3, 3);
 			cairo_set_source_rgb(cr, 1,1,1);
-			cairo_show_text(cr, o->text);
+			cairo_show_text(cr, data2->overlay_texts[i].text);
 			cairo_fill(cr);
 
-			cairo_translate(cr, -o->x + 3, -o->y -3);
+			cairo_translate(cr, -data2->overlay_texts[i].x + 3, -data2->overlay_texts[i].y -3);
 		}
 	}
 	bNeedRepaint = true;
 	pthread_mutex_unlock(&mut);
+}
+
+void ImageViewerComponent::on_click(double x, double y) {
+	bClick = true;
 }

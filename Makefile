@@ -48,6 +48,9 @@ $(LIBRARY) : $(OBJS)
 $(EXECUTABLE) : $(OBJS) $(TEST_OBJS)
 	@echo "Build executable $@"
 	@$(CXX) $(OBJS) $(TEST_OBJS) -o $@ $(LDFLAGS) 
+		
+install:
+	pgcc_add_project ./*.pgproject
 	
 
 

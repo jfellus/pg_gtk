@@ -20,13 +20,15 @@ public:
 
 	std::string title;
 
+	bool click;
+
 private:
 	ImageViewerComponent* viewer;
 	ImageRGB tmp;
 
 public:
 
-	GtkImageViewer() {viewer = 0; title="image";}
+	GtkImageViewer() {viewer = 0; title="image"; click = false;}
 
 	void init() {
 		viewer = new ImageViewerComponent(title);
@@ -34,16 +36,20 @@ public:
 
 	void process(const ImageRGB& in) {
 		viewer->set_image(in.data, in.w, in.h);
+		click = viewer->bClick;
+		viewer->swap();
 	}
 
 	void process(const Image& in) {
-		tmp.init(in.w, in.h);
+		if(tmp && (tmp.w!=in.w || tmp.h!=in.h)) tmp.free();
+		if(!tmp) tmp.init(in.w, in.h);
 		for(uint i=in.n; i--;) tmp[i*3] = tmp[i*3+1] = tmp[i*3+2] = in[i]*255;
 		process(tmp);
 	}
 
 	void process(const Matrix& in) {
-		tmp.init(in.w, in.h);
+		if(tmp && (tmp.w!=in.w || tmp.h!=in.h)) tmp.free();
+		if(!tmp) tmp.init(in.w, in.h);
 		for(uint i=in.n; i--;) tmp[i*3] = tmp[i*3+1] = tmp[i*3+2] = in[i]*255;
 		process(tmp);
 	}
