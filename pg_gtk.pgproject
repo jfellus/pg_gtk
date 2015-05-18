@@ -3,5 +3,6 @@ Include src/GtkImageOverlay.h
 Include src/GtkImageOverlayText.h
 Include src/GtkHistogram.h
 Include src/GtkPlot.h
+Include src/GtkImageRecords.h
 Library ./libpg_gtk.so
 Pkgconfig gtk+-3.0

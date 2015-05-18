@@ -11,7 +11,7 @@
 #include <pg.h>
 #include <image.h>
 
-#include "gtk/gtk.h"
+#include "gtk/gtkimageoverlay.h"
 
 
 
@@ -23,7 +23,7 @@ public:
 	bool click;
 
 private:
-	ImageViewerComponent* viewer;
+	GtkImageOverlayComponent* viewer;
 	ImageRGB tmp;
 
 public:
@@ -31,7 +31,7 @@ public:
 	GtkImageViewer() {viewer = 0; title="image"; click = false;}
 
 	void init() {
-		viewer = new ImageViewerComponent(title);
+		viewer = new GtkImageOverlayComponent(title);
 	}
 
 	void process(const ImageRGB& in) {
@@ -43,14 +43,14 @@ public:
 	void process(const Image& in) {
 		if(tmp && (tmp.w!=in.w || tmp.h!=in.h)) tmp.free();
 		if(!tmp) tmp.init(in.w, in.h);
-		for(uint i=in.n; i--;) tmp[i*3] = tmp[i*3+1] = tmp[i*3+2] = in[i]*255;
+		for(uint i=in.n; i--;) tmp[i*3] = tmp[i*3+1] = tmp[i*3+2] = (unsigned char) (in[i]*255);
 		process(tmp);
 	}
 
 	void process(const Matrix& in) {
 		if(tmp && (tmp.w!=in.w || tmp.h!=in.h)) tmp.free();
 		if(!tmp) tmp.init(in.w, in.h);
-		for(uint i=in.n; i--;) tmp[i*3] = tmp[i*3+1] = tmp[i*3+2] = in[i]*255;
+		for(uint i=in.n; i--;) tmp[i*3] = tmp[i*3+1] = tmp[i*3+2] = (unsigned char) (in[i]*255);
 		process(tmp);
 	}
 

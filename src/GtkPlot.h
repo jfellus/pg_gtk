@@ -10,7 +10,7 @@
 
 #include <pg.h>
 #include <matrix.h>
-#include "gtk/gtk.h"
+#include "gtk/gtkimageoverlay.h"
 #include <string.h>
 
 class GtkPlot {
@@ -22,13 +22,13 @@ public:
 private:
 	uint cur_x;
 	ImageRGB out;
-	ImageViewerComponent* viewer;
+	GtkImageOverlayComponent* viewer;
 
 private:
 	public:
 	GtkPlot() {title = "plot"; w = 640; h = 480; viewer = NULL; min = 0; max = 1;cur_x = 0;}
 
-	void init() {viewer = new ImageViewerComponent(title); out.init(w,h);}
+	void init() {viewer = new GtkImageOverlayComponent(title); out.init(w,h);}
 
 	void process(Matrix& in) {
 		for(uint y=0;y<h;y++) memset(out(cur_x, y), 255, 3);

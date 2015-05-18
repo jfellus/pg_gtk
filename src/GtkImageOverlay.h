@@ -12,7 +12,7 @@
 #include <pg.h>
 #include <image.h>
 
-#include "gtk/gtk.h"
+#include "gtk/gtkimageoverlay.h"
 
 
 
@@ -22,7 +22,7 @@ public:
 	std::string title;
 
 private:
-	ImageViewerComponent* viewer;
+	GtkImageOverlayComponent* viewer;
 	ImageRGB tmp;
 
 public:
@@ -30,7 +30,7 @@ public:
 	GtkImageOverlay() {viewer = 0; title="image";}
 
 	void init() {
-		viewer = new ImageViewerComponent(title);
+		viewer = new GtkImageOverlayComponent(title);
 	}
 
 
